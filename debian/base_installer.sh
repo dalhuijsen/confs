@@ -4,8 +4,8 @@ SERVERNAME="localhost"
 IP="127.0.0.1"
 DIST=wheezy
 CTRY=de
-MYSQLPWD="abc123"
-MYSQLROOTPWD="godmode"
+MYSQLPWD="deedee8u92dhb31123dzZ"
+MYSQLROOTPWD="${SERVERNAME}mYSQLDefPW"
 if test -z "$(grep deb-src $SOURCES)"; then
   echo "Wtf, no deb-src's set? must be some getto $SOURCES" >&2
   echo fixing it,.. adding deb-src urls to $SOURCES >&2
@@ -24,7 +24,7 @@ apt-get update
 apt-get upgrade
 sleep 1
 
-MUSTHAVE="install vim-nox screen figlet toilet toilet-fonts aalib bsdgames sudo wget curl libaa-bin"
+MUSTHAVE="install vim-nox screen figlet toilet toilet-fonts aalib bsdgames sudo wget curl libaa-bin unzip"
 BASHES="install bash bash-doc bash-static bash-completion"
 DEAMONS="systemd ntp"
 BASHDEV="source busybox"
@@ -32,7 +32,39 @@ VERSIONCONTROL="install cvs git subversion bzr"
 WEBMINDEPS="install perl libnet-ssleay-perl openssl libauthen-pam-perl libpam-runtime libio-pty-perl apt-show-versions python"
 THIRDPARTS="install p7zip-full"
 WORDPRESS="install apache2 libapache2-mod-php5 php5 php5-curl php5-intl php5-mcrypt php5-mysql php5-sqlite php5-xmlrpc mysql-server mysql-client"
-LAMP="mysql-server mysql-client apache2 apache2-mpm-prefork php5 php5-mysqlnd php5-adodb" 
+LAMP="mysql-server mysql-client apache2 apache2-mpm-prefork php5 php5-mysql php5-adodb" 
+OPENCART="php5-mysql php5-gd php5-curl php5-zip"
+
+currentConf () { 
+echo Current Config:
+echo $CURRENTCONFIG
+sleep 1
+for conf in $CURRENTCONFIG; do
+	apt-get  ${!conf}
+done
+}
+
+
+installOpenCart () { 
+	CURRENTCONFIG="MUSTHAVE DEAMONS VERSIONCONTROL LAMP OPENCART"
+	currentConf
+	echo "CREATE DATABASE mystore;
+grant all on mystore.* to 'opencart' identified by '${MYSQLPWD}';
+flush privileges;
+"
+	mkdir /tmp/oc
+	cd /tmp/oc
+	wget http://opencart.googlecode.com/files/opencart_v1.5.1.1.zip
+	unzip opencart_v1.5.1.1.zip
+	cp -rv opencart_v1.5.1.1/upload /var/www/opencart
+	cd /var/www/opencart
+	chmod 755 image/{,cache/,data/}  download/ config.php admin/config.php system/{cache/,logs/}
+	echo add to apache en config, shoud be it
+	
+
+
+}
+
 
 
 installWebmin () { 
@@ -48,32 +80,35 @@ fi
 	apt-get install webmin
 }
 
-installWordpress () { 
-CURRENTCONFIG="MUSTHAVE BASHES DEAMONS VERSIONCONTROL WORDPRESS"
-echo Current Config:
-echo $CURRENTCONFIG
-sleep 1
-for conf in $CURRENTCONFIG; do
-	apt-get  ${!conf}
-done
-
-	echo adding wordpress
-	mkdir -p /var/www/wordpress
-	echo "NameVirtualHost ${IP}:80
-<VirtualHost ${IP}:80>
+addVirtualHost () { 
+SN="$1"
+II="$2"
+HN="$3"
+DR="$4"
+	echo "NameVirtualHost ${II}:80
+<VirtualHost ${II}:80>
 	ServerAdmin root@127.0.0.1
-	ServerName ${SERVERNAME}
-	DocumentRoot /var/www/wordpress
+	ServerName ${HN}
+	DocumentRoot /var/www/${SN}
 	<Directory /var/www/>
-		Options +Indexes +MultiViews # +FollowSymLinks
+		Options +Indexes +MultiViews +FollowSymLinks
 		AllowOverride All
 		Order allow,deny
 		allow from all
 	</Directory>
 	LogLevel warn
-	ErrorLog \${APACHE_LOG_DIR}/${SERVERNAME}-error.log
-	CustomLog \${APACHE_LOG_DIR}/${SERVERNAME}-access.log combined
-</VirtualHost>" > /etc/apache2/sites-available/${SERVERNAME}.wordpress
+	ErrorLog \${APACHE_LOG_DIR}/${HN}-${SN}-error.log
+	CustomLog \${APACHE_LOG_DIR}/${HN}-${SN}-access.log combined
+</VirtualHost>" > /etc/apache2/sites-available/${HN}.${SN}
+}
+
+installWordpress () { 
+CURRENTCONFIG="MUSTHAVE BASHES DEAMONS VERSIONCONTROL WORDPRESS"
+SYSNAM=wordpress
+currentConf
+	addVirtualHost $SYSNAM $IP $SERVERNAME $DOCROOT
+	echo adding wordpress
+	mkdir -p /var/www/wordpress
 	echo disabling default site, adding wordpress
 	a2dissite default
 	echo -e "\n\n\n"
